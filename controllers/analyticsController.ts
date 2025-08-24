@@ -1,5 +1,5 @@
-import { AnalyticsFilters, analyticsService } from "../services/analyticsService";
-import { ApiResponse, AuthenticatedRequest } from "../types";
+import {  analyticsService } from "../services/analyticsService";
+import { AnalyticsFilters, ApiResponse, AuthenticatedRequest } from "../types";
 import { Response } from 'express';
 import { URL } from "../models/Url";
 

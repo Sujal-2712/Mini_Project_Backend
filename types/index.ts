@@ -81,18 +81,19 @@ export interface IUrl extends Document {
   isExpired(): boolean;
 }
 
-export interface IUrlAnalytics {
-  totalClicks: number;
-  topCountries: { [key: string]: number };
-  topCities: { [key: string]: number };
-  topDevices: { [key: string]: number };
-  topBrowsers: { [key: string]: number };
-  topOS: { [key: string]: number };
-  clicksByDate: { [key: string]: number };
-}
+// export interface IUrlAnalytics {
+//   totalClicks: number;
+//   topCountries: { [key: string]: number };
+//   topCities: { [key: string]: number };
+//   topDevices: { [key: string]: number };
+//   topBrowsers: { [key: string]: number };
+//   topOS: { [key: string]: number };
+//   clicksByDate: { [key: string]: number };
+// }
 
 export interface IUrlWithAnalytics extends IUrl {
-  analytics: IUrlAnalytics;
+  data: IUrl[];
+  // analytics: IUrlAnalytics;
 }
 
 // Click Types

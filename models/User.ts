@@ -75,20 +75,20 @@ const userSchema = new Schema<IUser>({
     type: Date,
     default: null
   },
-  urls: [{
-    type: Schema.Types.ObjectId,
-    ref: 'urls'
-  }]
+  // urls: [{
+  //   type: Schema.Types.ObjectId,
+  //   ref: 'urls'
+  // }]
 }, {
   timestamps: true
 });
 
 // Virtual for total clicks across all URLs
-userSchema.virtual('totalClicks').get(function() {
-  return this.urls.reduce((total: number, url: any) => {
-    return total + (url.clicks ? url.clicks.length : 0);
-  }, 0);
-});
+// userSchema.virtual('totalClicks').get(function() {
+//   return this.urls.reduce((total: number, url: any) => {
+//     return total + (url.clicks ? url.clicks.length : 0);
+//   }, 0);
+// });
 
 userSchema.set('toJSON', { virtuals: true });
 

@@ -263,11 +263,6 @@ class AuthController {
 
       const user = await USER.findById(userId)
         .select('-password -reset_password_otp -reset_password_otp_expires')
-        .populate({
-          path: 'urls',
-          select: 'title createdAt clicks',
-          options: { sort: { createdAt: -1 }, limit: 5 }
-        });
 
       if (!user) {
         res.status(404).json({
@@ -285,7 +280,6 @@ class AuthController {
           email: user.email,
           profile_img: user.profile_img,
           total_links: user.total_links,
-          totalClicks: user.totalClicks || 0
         }
       });
 

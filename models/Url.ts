@@ -16,7 +16,7 @@ const urlSchema = new Schema<IUrl>(
     custom_url: {
       type: String,
       unique: true,
-      sparse: true, // Allow multiple null values
+      sparse: true,
       lowercase: true,
       trim: true,
       validate: {
@@ -53,12 +53,16 @@ const urlSchema = new Schema<IUrl>(
     qr: {
       type: String, // Base64 encoded QR code
     },
-    clicks: [
-      {
-        type: Schema.Types.ObjectId,
-        ref: "clicks",
-      },
-    ],
+    clickCount: {
+      type: Number,
+      default: 0,
+    },
+    // clicks: [
+    //   {
+    //     type: Schema.Types.ObjectId,
+    //     ref: "clicks",
+    //   },
+    // ],
     is_active: {
       type: Boolean,
       default: true,
@@ -80,12 +84,7 @@ const urlSchema = new Schema<IUrl>(
   }
 );
 
-// Virtual for click count
-urlSchema.virtual("clickCount").get(function () {
-  return this['clicks'] ? this['clicks'].length : 0;
-});
 
-// Method to check if URL is expired
 (urlSchema.methods as any).isExpired = function (): boolean {
   return this['expires_at'] ? new Date() > this['expires_at'] : false;
 };

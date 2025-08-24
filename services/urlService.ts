@@ -9,7 +9,7 @@ interface CreateUrlData {
   customUrl?: string;
   title?: string;
   userId: string;
-  qrCode?: string;
+  qrCode?: string | null;
 }
 
 interface CreatedUrlResponse {

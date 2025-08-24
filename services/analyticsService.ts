@@ -2,6 +2,7 @@ import { CLICKS } from '../models/Clicks';
 import { URL } from '../models/Url';
 import mongoose from 'mongoose';
 import { PipelineStage } from "mongoose";
+import { AnalyticsFilters, OverallAnalytics } from '../types';
 
 class AnalyticsService {
     async getOverallAnalytics(userId: string, filters: AnalyticsFilters = {}): Promise<OverallAnalytics> {

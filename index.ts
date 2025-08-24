@@ -39,6 +39,7 @@ app.use('/api/url', urlRoutes);
 app.use('/api/analytics', analyticsRoutes);
 // URL redirect route
 app.get('/url/:shortUrl', (req, res) => {
+  console.log(req.params.shortUrl);
   return urlController.redirectUrl(req, res);
 });
 

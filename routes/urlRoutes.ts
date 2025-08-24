@@ -36,16 +36,18 @@ router.get('/user-urls',
   (req: any, res: any) => urlController.getUserUrls(req, res)
 );
 
-router.get('/get/:id', 
-  auth,
-  urlValidation.getUrl, 
-  (req: any, res: any) => urlController.getUrlById(req, res)
-);
+// router.get('/get/:id', 
+//   auth,
+//   urlValidation.getUrl, 
+//   (req: any, res: any) => urlController.getUrlById(req, res)
+// );
 
 router.delete('/delete/:id', 
   auth, 
   urlValidation.getUrl, 
   urlController.deleteUrl
 );
+
+
 
 export default router; 

@@ -1,21 +1,28 @@
-import { Request, Response } from 'express';
-import { validationResult } from 'express-validator';
-import { nanoid } from 'nanoid';
+import { Request, Response } from "express";
+import { validationResult } from "express-validator";
+import { nanoid } from "nanoid";
 
-import { URL } from '../models/Url';
-import { USER } from '../models/User';
-import { CLICKS } from '../models/Clicks';
-import urlService from '../services/urlService';
-import qrService from '../services/qrService';
-import geoService from '../services/geoService';
-import logger from '../utils/logger/logger';
-import { AuthenticatedRequest, ApiResponse, IUrlWithAnalytics, IUrlAnalytics, PaginatedResponse } from '../types/index';
+import { URL } from "../models/Url";
+import { USER } from "../models/User";
+import { CLICKS } from "../models/Clicks";
+import urlService from "../services/urlService";
+import qrService from "../services/qrService";
+import geoService from "../services/geoService";
+import logger from "../utils/logger/logger";
+import {
+  AuthenticatedRequest,
+  ApiResponse,
+  PaginatedResponse,
+  IUrl,
+} from "../types/index";
 
 class UrlController {
-  async shortenUrl(req: AuthenticatedRequest, res: Response<ApiResponse>): Promise<void> {
+  async shortenUrl(
+    req: AuthenticatedRequest,
+    res: Response<ApiResponse>
+  ): Promise<void> {
     try {
       const errors = validationResult(req);
-
       if (!errors.isEmpty()) {
         res.status(400).json({
           success: false,
@@ -25,20 +32,19 @@ class UrlController {
         return;
       }
 
-      const { longUrl, customUrl, title } = req.body;
+      const { longUrl, customUrl, title, qrEnabled } = req.body;
       const userId = req.user;
       const qrCodeBuffer = (req as any).file?.buffer;
-      let qrCodeBase64: string | undefined;
+      let qrCodeBase64: string | null = null;
 
       if (!userId) {
         res.status(401).json({
           success: false,
-          message: 'User not authenticated'
+          message: "User not authenticated",
         });
         return;
       }
 
-      // Step 1: Check if longUrl already exists
       const existingLongUrl = await urlService.findByLongUrl(longUrl, userId);
       if (existingLongUrl) {
         res.status(409).json({
@@ -48,7 +54,6 @@ class UrlController {
         });
         return;
       }
-
       if (customUrl) {
         const existingCustomUrl = await urlService.findByCustomUrl(customUrl);
         if (existingCustomUrl) {
@@ -60,13 +65,17 @@ class UrlController {
           return;
         }
       }
-
-      if (qrCodeBuffer) {
-        qrCodeBase64 = `data:image/png;base64,${qrCodeBuffer.toString("base64")}`;
+      if (qrEnabled) {
+        if (qrCodeBuffer) {
+          qrCodeBase64 = `data:image/png;base64,${qrCodeBuffer.toString(
+            "base64"
+          )}`;
+        } else {
+          qrCodeBase64 = await qrService.generateQRCode(longUrl);
+        }
       } else {
-        qrCodeBase64 = await qrService.generateQRCode(longUrl);
+        qrCodeBase64 = null;
       }
-
       const shortId = customUrl || nanoid(8);
       const urlData = await urlService.createShortUrl({
         longUrl,
@@ -96,62 +105,81 @@ class UrlController {
       res.status(500).json({
         success: false,
         message: "Internal server error",
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: error instanceof Error ? error.message : "Unknown error",
       });
     }
   }
 
-  async getUserUrls(req: AuthenticatedRequest, res: Response<PaginatedResponse<IUrlWithAnalytics>>): Promise<void> {
+  async getUserUrls(
+    req: AuthenticatedRequest,
+    res: Response<PaginatedResponse<IUrl>>
+  ): Promise<void> {
     try {
       const userId = req.user;
-      const page = parseInt(req.query['page'] as string) || 1;
-      const limit = parseInt(req.query['limit'] as string) || 10;
+      const page = parseInt(req.query["page"] as string) || 1;
+      const limit = parseInt(req.query["limit"] as string) || 10;
       const skip = (page - 1) * limit;
+
+      // Filters
+      const startDate = req.query["startDate"] as string | undefined;
+      const endDate = req.query["endDate"] as string | undefined;
+      const tags = req.query["tags"] as string | undefined; // comma-separated
 
       if (!userId) {
         res.status(401).json({
           success: false,
-          message: 'User not authenticated',
+          message: "User not authenticated",
           data: [],
           pagination: {
             totalItems: 0,
             currentPage: page,
             pageSize: limit,
-            totalPages: 0
-          }
+            totalPages: 0,
+          },
         });
         return;
       }
 
-      const urls = await URL.find({ user_id: userId })
-        .populate({
-          path: "clicks",
-          select: "city device country browser os timestamp",
-          options: { sort: { createdAt: -1 } },
-        })
+      // Build dynamic filter query
+      const filterQuery: any = {
+        user_id: userId,
+      };
+
+      // Filter by createdAt date range
+      if (startDate || endDate) {
+        filterQuery.createdAt = {};
+        if (startDate) {
+          filterQuery.createdAt.$gte = new Date(startDate);
+        }
+        if (endDate) {
+          filterQuery.createdAt.$lte = new Date(endDate);
+        }
+      }
+
+      // Filter by tags
+      if (tags) {
+        const tagArray = tags.split(",").map((tag) => tag.trim().toLowerCase());
+        filterQuery.tags = { $in: tagArray };
+      }
+
+      const urls: IUrl[] = await URL.find(filterQuery)
+        .select("-qr")
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit);
 
-      const totalUrls = await URL.countDocuments({ user_id: userId });
-      const urlsWithAnalytics = urls.map((url) => {
-        const analytics = this.calculateUrlAnalytics(url.clicks as any[]);
-        return {
-          ...url.toObject(),
-          analytics,
-        };
-      });
+      const totalUrls = await URL.countDocuments(filterQuery);
 
       res.status(200).json({
         success: true,
         message: "URLs fetched successfully",
-        data: urlsWithAnalytics,
+        data: urls,
         pagination: {
           totalItems: totalUrls,
           currentPage: page,
           pageSize: limit,
-          totalPages: Math.ceil(totalUrls / limit)
-        }
+          totalPages: Math.ceil(totalUrls / limit),
+        },
       });
     } catch (error) {
       logger.error("Error fetching user URLs:", error);
@@ -163,13 +191,16 @@ class UrlController {
           totalItems: 0,
           currentPage: 1,
           pageSize: 10,
-          totalPages: 0
-        }
+          totalPages: 0,
+        },
       });
     }
   }
 
-  async getUrlById(req: AuthenticatedRequest, res: Response<ApiResponse<IUrlWithAnalytics>>): Promise<void> {
+  async getUrlById(
+    req: AuthenticatedRequest,
+    res: Response<ApiResponse<IUrl>>
+  ): Promise<void> {
     try {
       const { id } = req.params;
       const userId = req.user;
@@ -177,17 +208,12 @@ class UrlController {
       if (!userId) {
         res.status(401).json({
           success: false,
-          message: 'User not authenticated'
+          message: "User not authenticated",
         });
         return;
       }
 
-      const url = await URL.findOne({ _id: id, user_id: userId }).populate({
-        path: "clicks",
-        select: "city device country browser os timestamp referer",
-        options: { sort: { createdAt: -1 } },
-      });
-
+      const url = await URL.findOne({ _id: id, user_id: userId });
       if (!url) {
         res.status(404).json({
           success: false,
@@ -196,15 +222,12 @@ class UrlController {
         return;
       }
 
-      const analytics = this.calculateDetailedAnalytics(url.clicks as any[]);
+      // const analytics = this.calculateDetailedAnalytics(url.clicks as any[]);
 
       res.status(200).json({
         success: true,
         message: "URL fetched successfully",
-        data: {
-          ...url.toObject(),
-          analytics,
-        },
+        data: url,
       });
     } catch (error) {
       logger.error("Error fetching URL:", error);
@@ -215,7 +238,10 @@ class UrlController {
     }
   }
 
-  async deleteUrl(req: AuthenticatedRequest, res: Response<ApiResponse>): Promise<void> {
+  async deleteUrl(
+    req: AuthenticatedRequest,
+    res: Response<ApiResponse>
+  ): Promise<void> {
     try {
       const { id } = req.params;
       const userId = req.user;
@@ -223,7 +249,7 @@ class UrlController {
       if (!userId) {
         res.status(401).json({
           success: false,
-          message: 'User not authenticated'
+          message: "User not authenticated",
         });
         return;
       }
@@ -246,7 +272,7 @@ class UrlController {
         $inc: { total_links: -1 },
       });
       await CLICKS.deleteMany({ url_id: id });
-      
+
       res.status(200).json({
         success: true,
         message: "URL deleted successfully",
@@ -274,7 +300,9 @@ class UrlController {
         });
         return;
       }
+      console.log(urlData._id);
       await this.trackClick((urlData._id as any).toString(), req);
+      console.log("clicked");
       res.redirect(301, urlData.original_url);
     } catch (error) {
       logger.error("Error redirecting URL:", error);
@@ -287,6 +315,7 @@ class UrlController {
 
   private async trackClick(urlId: string, req: Request): Promise<void> {
     try {
+      console.log(urlId);
       const analyticsData = await geoService.getAnalyticsData(req);
 
       // Create click record
@@ -305,9 +334,8 @@ class UrlController {
 
       await click.save();
 
-      // Update URL with click reference
       await URL.findByIdAndUpdate(urlId, {
-        $push: { clicks: click._id },
+        $inc: { clickCount: 1 },
       });
 
       logger.info(`Click tracked for URL: ${urlId}`);
@@ -316,59 +344,59 @@ class UrlController {
     }
   }
 
-  private calculateUrlAnalytics(clicks: any[]): IUrlAnalytics {
-    const analytics: IUrlAnalytics = {
-      totalClicks: clicks.length,
-      topCountries: {},
-      topCities: {},
-      topDevices: {},
-      topBrowsers: {},
-      topOS: {},
-      clicksByDate: {},
-    };
+  // private calculateUrlAnalytics(clicks: any[]): IUrlAnalytics {
+  //   const analytics: IUrlAnalytics = {
+  //     totalClicks: clicks.length,
+  //     topCountries: {},
+  //     topCities: {},
+  //     topDevices: {},
+  //     topBrowsers: {},
+  //     topOS: {},
+  //     clicksByDate: {},
+  //   };
 
-    clicks.forEach((click) => {
-      // Count countries
-      analytics.topCountries[click.country] = (analytics.topCountries[click.country] || 0) + 1;
+  //   clicks.forEach((click) => {
+  //     // Count countries
+  //     analytics.topCountries[click.country] = (analytics.topCountries[click.country] || 0) + 1;
 
-      // Count cities
-      analytics.topCities[click.city] = (analytics.topCities[click.city] || 0) + 1;
+  //     // Count cities
+  //     analytics.topCities[click.city] = (analytics.topCities[click.city] || 0) + 1;
 
-      // Count devices
-      analytics.topDevices[click.device] = (analytics.topDevices[click.device] || 0) + 1;
+  //     // Count devices
+  //     analytics.topDevices[click.device] = (analytics.topDevices[click.device] || 0) + 1;
 
-      // Count browsers
-      analytics.topBrowsers[click.browser] = (analytics.topBrowsers[click.browser] || 0) + 1;
+  //     // Count browsers
+  //     analytics.topBrowsers[click.browser] = (analytics.topBrowsers[click.browser] || 0) + 1;
 
-      // Count OS
-      analytics.topOS[click.os] = (analytics.topOS[click.os] || 0) + 1;
+  //     // Count OS
+  //     analytics.topOS[click.os] = (analytics.topOS[click.os] || 0) + 1;
 
-      // Count by date
-      const date = new Date(click.timestamp).toISOString().split('T')[0];
-      if (date) {
-        analytics.clicksByDate[date] = (analytics.clicksByDate[date] || 0) + 1;
-      }
-    });
+  //     // Count by date
+  //     const date = new Date(click.timestamp).toISOString().split('T')[0];
+  //     if (date) {
+  //       analytics.clicksByDate[date] = (analytics.clicksByDate[date] || 0) + 1;
+  //     }
+  //   });
 
-    // Sort all objects by value (descending)
-    analytics.topCountries = this.sortObjectByValue(analytics.topCountries);
-    analytics.topCities = this.sortObjectByValue(analytics.topCities);
-    analytics.topDevices = this.sortObjectByValue(analytics.topDevices);
-    analytics.topBrowsers = this.sortObjectByValue(analytics.topBrowsers);
-    analytics.topOS = this.sortObjectByValue(analytics.topOS);
+  //   // Sort all objects by value (descending)
+  //   analytics.topCountries = this.sortObjectByValue(analytics.topCountries);
+  //   analytics.topCities = this.sortObjectByValue(analytics.topCities);
+  //   analytics.topDevices = this.sortObjectByValue(analytics.topDevices);
+  //   analytics.topBrowsers = this.sortObjectByValue(analytics.topBrowsers);
+  //   analytics.topOS = this.sortObjectByValue(analytics.topOS);
 
-    return analytics;
-  }
+  //   return analytics;
+  // }
 
-  private calculateDetailedAnalytics(clicks: any[]): IUrlAnalytics {
-    return this.calculateUrlAnalytics(clicks);
-  }
+  // private calculateDetailedAnalytics(clicks: any[]): IUrlAnalytics {
+  //   return this.calculateUrlAnalytics(clicks);
+  // }
 
-  private sortObjectByValue(obj: { [key: string]: number }): { [key: string]: number } {
-    return Object.fromEntries(
-      Object.entries(obj).sort(([, a], [, b]) => b - a)
-    );
-  }
+  // private sortObjectByValue(obj: { [key: string]: number }): { [key: string]: number } {
+  //   return Object.fromEntries(
+  //     Object.entries(obj).sort(([, a], [, b]) => b - a)
+  //   );
+  // }
 }
 
-export default new UrlController(); 
+export default new UrlController();
