@@ -120,10 +120,10 @@ class UrlController {
       const limit = parseInt(req.query["limit"] as string) || 10;
       const skip = (page - 1) * limit;
 
-      // Filters
       const startDate = req.query["startDate"] as string | undefined;
       const endDate = req.query["endDate"] as string | undefined;
-      const tags = req.query["tags"] as string | undefined; // comma-separated
+      const tags = req.query["tags[]"] as string | undefined;
+      const search = req.query["search"] as string | undefined;
 
       if (!userId) {
         res.status(401).json({
@@ -145,7 +145,7 @@ class UrlController {
         user_id: userId,
       };
 
-      // Filter by createdAt date range
+      // Filter by date range
       if (startDate || endDate) {
         filterQuery.createdAt = {};
         if (startDate) {
@@ -160,6 +160,17 @@ class UrlController {
       if (tags) {
         const tagArray = tags.split(",").map((tag) => tag.trim().toLowerCase());
         filterQuery.tags = { $in: tagArray };
+      }
+
+      // Filter by search keyword
+      if (search) {
+        const searchRegex = new RegExp(search, "i"); // Case-insensitive
+        filterQuery.$or = [
+          { originalUrl: searchRegex },
+          { shortUrl: searchRegex },
+          { title: searchRegex }, // Include if your model has a 'title'
+          { description: searchRegex }, // Include if your model has a 'description'
+        ];
       }
 
       const urls: IUrl[] = await URL.find(filterQuery)
