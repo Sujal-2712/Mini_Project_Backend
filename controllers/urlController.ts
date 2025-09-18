@@ -124,6 +124,7 @@ class UrlController {
       const endDate = req.query["endDate"] as string | undefined;
       const tags = req.query["tags[]"] as string | undefined;
       const search = req.query["search"] as string | undefined;
+      const isactive = req.query["isActive"] as string | undefined;
 
       if (!userId) {
         res.status(401).json({
@@ -139,13 +140,9 @@ class UrlController {
         });
         return;
       }
-
-      // Build dynamic filter query
       const filterQuery: any = {
         user_id: userId,
       };
-
-      // Filter by date range
       if (startDate || endDate) {
         filterQuery.createdAt = {};
         if (startDate) {
@@ -155,22 +152,23 @@ class UrlController {
           filterQuery.createdAt.$lte = new Date(endDate);
         }
       }
-
-      // Filter by tags
       if (tags) {
         const tagArray = tags.split(",").map((tag) => tag.trim().toLowerCase());
         filterQuery.tags = { $in: tagArray };
       }
-
-      // Filter by search keyword
       if (search) {
-        const searchRegex = new RegExp(search, "i"); // Case-insensitive
+        const searchRegex = new RegExp(search, "i");
         filterQuery.$or = [
           { originalUrl: searchRegex },
           { shortUrl: searchRegex },
-          { title: searchRegex }, // Include if your model has a 'title'
-          { description: searchRegex }, // Include if your model has a 'description'
+          { title: searchRegex },
+          { description: searchRegex },
         ];
+      }
+      if (isactive === "1") {
+        filterQuery.is_active = true;
+      } else if (isactive === "0") {
+        filterQuery.is_active = false;
       }
 
       const urls: IUrl[] = await URL.find(filterQuery)
