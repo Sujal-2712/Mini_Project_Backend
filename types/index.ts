@@ -1,5 +1,5 @@
-import { Request } from 'express';
-import { Document } from 'mongoose';
+import { Request } from "express";
+import { Document } from "mongoose";
 
 // Generic Response Interfaces
 export interface ApiResponse<T = any> {
@@ -9,15 +9,8 @@ export interface ApiResponse<T = any> {
   error?: any;
 }
 
-
-interface JwtPayload {
-  userId: string;
-  email: string;
-  profile_img?: string;
-}
-
 export interface PaginatedResponse<T> {
-  success: boolean;
+  success?: boolean;
   message?: string;
   data: T[];
   pagination: {
@@ -169,8 +162,9 @@ export interface ValidationError {
 
 // Pagination Types
 export interface PaginationQuery {
-  page?: number;
-  limit?: number;
+  page?: string;
+  limit?: string;
+  pageSize?: string;
 }
 
 export interface PaginationResult {
@@ -204,8 +198,6 @@ export interface EnvironmentVariables {
   NODE_ENV: string;
 }
 
-
-
 export interface AnalyticsFilters {
   startDate?: Date;
   endDate?: Date;
@@ -222,17 +214,17 @@ export interface OverallAnalytics {
   topDevices: Array<{ device: string; clicks: number; percentage: number }>;
   topBrowsers: Array<{ browser: string; clicks: number; percentage: number }>;
   topPerformingUrls: Array<{
-      url_id: string;
-      title: string;
-      short_url: string;
-      clicks: number;
-      original_url: string;
+    url_id: string;
+    title: string;
+    short_url: string;
+    clicks: number;
+    original_url: string;
   }>;
-  recentActivity: Array<{
-      timestamp: Date;
-      country: string;
-      city: string;
-      device: string;
-      url_title: string;
-  }>;
+  // recentActivity: Array<{
+  //   timestamp: Date;
+  //   country: string;
+  //   city: string;
+  //   device: string;
+  //   url_title: string;
+  // }>;
 }

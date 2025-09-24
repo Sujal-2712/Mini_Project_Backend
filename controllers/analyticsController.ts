@@ -1,5 +1,10 @@
 import { analyticsService } from "../services/analyticsService";
-import { AnalyticsFilters, ApiResponse, AuthenticatedRequest } from "../types";
+import {
+  AnalyticsFilters,
+  ApiResponse,
+  AuthenticatedRequest,
+  PaginationQuery,
+} from "../types";
 import { Response } from "express";
 import { URL } from "../models/Url";
 
@@ -98,7 +103,7 @@ class AnalyticsController {
           topCountries: last30DaysAnalytics.topCountries.slice(0, 5),
           topUrls: last30DaysAnalytics.topPerformingUrls.slice(0, 5),
         },
-        recentActivity: allTimeAnalytics.recentActivity.slice(0, 5),
+        // recentActivity: allTimeAnalytics.recentActivity.slice(0, 5),
       },
     });
   }
@@ -149,6 +154,34 @@ class AnalyticsController {
         },
       },
     });
+  }
+
+  public async getRecentActivityWithPagination(
+    req: AuthenticatedRequest & { query: PaginationQuery },
+    res: Response
+  ): Promise<Response> {
+    try {
+      const page = parseInt(req.query.page ?? "1");
+      const pageSize = parseInt(req.query.pageSize ?? "5") ;
+      const userId = req.user;
+      const userUrls = await URL.find({ user_id: userId }).select("_id");
+      const urlIds = userUrls.map((url) => url._id);
+      const matchConditions: any = {
+        url_id: { $in: urlIds },
+      };
+      const response = await analyticsService.getRecentActivity(
+        matchConditions,
+        page,
+        pageSize
+      );
+      return res.status(200).json(response);
+    } catch (error) {
+      console.error("Error fetching recent activity:", error);
+      return res.status(500).json({
+        success: false,
+        message: "An error occurred while fetching recent activity",
+      });
+    }
   }
 }
 
