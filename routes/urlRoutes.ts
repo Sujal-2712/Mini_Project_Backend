@@ -7,25 +7,25 @@ import { shortenLimiter } from '../middleware/rateLimiter';
 
 const router = express.Router();
 
-const storage = multer.memoryStorage();
-const upload = multer({ 
-  storage: storage,
-  limits: {
-    fileSize: 5 * 1024 * 1024
-  },
-  fileFilter: (_req, file, cb) => {
-    if (file.mimetype.startsWith('image/')) {
-      cb(null, true);
-    } else {
-      cb(null, false);
-    }
-  }
-});
+// const storage = multer.memoryStorage();
+// const upload = multer({ 
+//   storage: storage,
+//   limits: {
+//     fileSize: 5 * 1024 * 1024
+//   },
+//   fileFilter: (_req, file, cb) => {
+//     if (file.mimetype.startsWith('image/')) {
+//       cb(null, true);
+//     } else {
+//       cb(null, false);
+//     }
+//   }
+// });
 
 router.post('/shorten', 
   auth, 
   shortenLimiter,
-  upload.single('qrCodeImage'),
+  // upload.single('qrCodeImage'),
   urlValidation.shortenUrl,
   (req: any, res: any) => urlController.shortenUrl(req, res)
 );

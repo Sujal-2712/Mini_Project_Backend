@@ -32,7 +32,7 @@ class UrlController {
         return;
       }
 
-      const { longUrl, customUrl, title, qrEnabled } = req.body;
+      const { longUrl, customUrl, title, qrEnabled, source } = req.body;
       const userId = req.user;
       const qrCodeBuffer = (req as any).file?.buffer;
       let qrCodeBase64: string | null = null;
@@ -83,6 +83,7 @@ class UrlController {
         title: title || longUrl,
         userId,
         qrCode: qrCodeBase64,
+        source,
       });
 
       res.status(201).json({
@@ -116,6 +117,7 @@ class UrlController {
   ): Promise<void> {
     try {
       const userId = req.user;
+      // Parse query parameters
       const page = parseInt(req.query["page"] as string) || 1;
       const limit = parseInt(req.query["limit"] as string) || 10;
       const skip = (page - 1) * limit;
@@ -124,53 +126,77 @@ class UrlController {
       const endDate = req.query["endDate"] as string | undefined;
       const tags = req.query["tags[]"] as string | undefined;
       const search = req.query["search"] as string | undefined;
-      const isactive = req.query["isActive"] as string | undefined;
+      const isActive = req.query["isActive"] as string | undefined;
+      const source = req.query["source"] as string | undefined;
 
-      if (!userId) {
-        res.status(401).json({
-          success: false,
-          message: "User not authenticated",
-          data: [],
-          pagination: {
-            totalItems: 0,
-            currentPage: page,
-            pageSize: limit,
-            totalPages: 0,
-          },
-        });
-        return;
-      }
-      const filterQuery: any = {
+      // Build filter query
+      const filterQuery: Record<string, any> = {
         user_id: userId,
       };
+
+      // Date filter
       if (startDate || endDate) {
-        filterQuery.createdAt = {};
+        filterQuery["createdAt"] = {};
         if (startDate) {
-          filterQuery.createdAt.$gte = new Date(startDate);
+          const start = new Date(startDate);
+          if (!isNaN(start.getTime())) {
+            filterQuery["createdAt"].$gte = start;
+          }
         }
         if (endDate) {
-          filterQuery.createdAt.$lte = new Date(endDate);
+          const end = new Date(endDate);
+          if (!isNaN(end.getTime())) {
+            end.setHours(23, 59, 59, 999);
+            filterQuery["createdAt"].$lte = end;
+          }
+        }
+
+        // Remove createdAt filter if both dates are invalid
+        if (Object.keys(filterQuery["createdAt"]).length === 0) {
+          delete filterQuery["createdAt"];
         }
       }
+
+      // Tags filter
       if (tags) {
-        const tagArray = tags.split(",").map((tag) => tag.trim().toLowerCase());
-        filterQuery.tags = { $in: tagArray };
+        const tagArray = tags
+          .split(",")
+          .map((tag) => tag.trim().toLowerCase())
+          .filter((tag) => tag.length > 0);
+        if (tagArray.length > 0) {
+          filterQuery["tags"] = { $in: tagArray };
+        }
       }
-      if (search) {
+
+      // Search filter
+      if (search && search.trim() !== "") {
         const searchRegex = new RegExp(search, "i");
-        filterQuery.$or = [
+        filterQuery["$or"] = [
           { originalUrl: searchRegex },
           { shortUrl: searchRegex },
           { title: searchRegex },
           { description: searchRegex },
         ];
       }
-      if (isactive === "1") {
-        filterQuery.is_active = true;
-      } else if (isactive === "0") {
-        filterQuery.is_active = false;
+
+      // is_active filter
+      if (isActive === "1") {
+        filterQuery["is_active"] = true;
+      } else if (isActive === "0") {
+        filterQuery["is_active"] = false;
       }
 
+      // source filter (strict equality)
+      if (source && source.trim() !== "") {
+        filterQuery["source"] = source.trim();
+      }
+
+      // Log filter query in development only
+      if (process.env["NODE_ENV"] !== "production") {
+        console.log("Filter Query:", JSON.stringify(filterQuery));
+      }
+
+      // Query DB
       const urls: IUrl[] = await URL.find(filterQuery)
         .select("-qr")
         .sort({ createdAt: -1 })

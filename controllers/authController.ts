@@ -343,8 +343,7 @@ class AuthController {
     }
   }
 
-  async verifyEmail(req: Request, res: Response<ApiResponse>) {
-
+  async verifyEmail(req: Request, res: Response) {
     const { token } = req.query;
     if (!token) return res.status(400).json({ success: false, message: 'Token required' });
     const user = await USER.findOne({

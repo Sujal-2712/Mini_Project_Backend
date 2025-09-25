@@ -10,6 +10,7 @@ interface CreateUrlData {
   title?: string;
   userId: string;
   qrCode?: string | null;
+  source: string;
 }
 
 interface CreatedUrlResponse {
@@ -18,7 +19,8 @@ interface CreatedUrlResponse {
   short_url: string;
   custom_url?: string | undefined;
   title: string;
-  qr?: string | undefined;
+  source: string;
+  qr?: string | null | undefined;
   createdAt: Date;
 }
 
@@ -43,7 +45,7 @@ class UrlService {
     return shortUrl;
   }
 
-  async createShortUrl({ longUrl, customUrl, title, userId, qrCode }: CreateUrlData): Promise<CreatedUrlResponse> {
+  async createShortUrl({ longUrl, customUrl, title, userId, qrCode,source }: CreateUrlData): Promise<CreatedUrlResponse> {
     try {
       // Generate short URL
       const shortUrl = customUrl || (await this.generateUniqueShortUrl());
@@ -68,14 +70,10 @@ class UrlService {
         user_id: userId,
         title: title || longUrl,
         qr: qrCode,
+        source
       });
       
       await newUrl.save();
-      await USER.findByIdAndUpdate(userId, {
-        $push: { urls: newUrl._id },
-        $inc: { total_links: 1 },
-      });
-
       logger.info(`URL shortened successfully: ${longUrl} -> ${shortUrl}`);
 
       return {
@@ -84,8 +82,9 @@ class UrlService {
         short_url: shortUrl,
         custom_url: customUrl,
         title: newUrl.title || '',
-        qr: qrCode,
+        qr: qrCode || null,
         createdAt: newUrl.createdAt,
+        source: source
       };
     } catch (error) {
       logger.error("Error creating short URL:", error);

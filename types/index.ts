@@ -71,6 +71,7 @@ export interface IUrl extends Document {
   clickCount?: number;
   createdAt: Date;
   updatedAt: Date;
+  source: string;
   isExpired(): boolean;
 }
 

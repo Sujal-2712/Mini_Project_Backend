@@ -1,5 +1,5 @@
-import mongoose, { Schema } from 'mongoose';
-import { IUrl } from '../types/index';
+import mongoose, { Schema } from "mongoose";
+import { IUrl } from "../types/index";
 
 const urlSchema = new Schema<IUrl>(
   {
@@ -21,7 +21,7 @@ const urlSchema = new Schema<IUrl>(
       trim: true,
       validate: {
         validator: function (value: string) {
-          if (!value) return true; // Allow null/undefined
+          if (!value) return true;
           return /^[a-zA-Z0-9_-]+$/.test(value);
         },
         message:
@@ -57,12 +57,11 @@ const urlSchema = new Schema<IUrl>(
       type: Number,
       default: 0,
     },
-    // clicks: [
-    //   {
-    //     type: Schema.Types.ObjectId,
-    //     ref: "clicks",
-    //   },
-    // ],
+    source: {
+      type: String,
+      trim: true,
+      maxlength: [10, "Source cannot exceed 100 characters"],
+    },
     is_active: {
       type: Boolean,
       default: true,
@@ -84,11 +83,10 @@ const urlSchema = new Schema<IUrl>(
   }
 );
 
-
 (urlSchema.methods as any).isExpired = function (): boolean {
-  return this['expires_at'] ? new Date() > this['expires_at'] : false;
+  return this["expires_at"] ? new Date() > this["expires_at"] : false;
 };
 
 urlSchema.set("toJSON", { virtuals: true });
 
-export const URL = mongoose.model<IUrl>("urls", urlSchema); 
+export const URL = mongoose.model<IUrl>("urls", urlSchema);
