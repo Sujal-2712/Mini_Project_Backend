@@ -119,7 +119,7 @@ class AuthController {
         profile_img: user.profile_img
       };
 
-      const token = jwt.sign(payload, process.env['JWT_SECRET'] || 'default-secret', { expiresIn: '1h' });
+      const token = jwt.sign(payload, process.env['JWT_SECRET'] || 'default-secret', { expiresIn: '6h' });
 
       logger.info(`User logged in: ${email}`);
 

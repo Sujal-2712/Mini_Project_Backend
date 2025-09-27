@@ -114,12 +114,11 @@ class AnalyticsController {
   ): Promise<void> {
     const { urlId } = req.params;
     const user_id = req.user;
-    const { startDate, endDate, timeRange = "30d" } = req.query;
-
+    const { startDate, endDate, timeRange = "30d" } = req.query;  
     const url = await URL.findOne({ _id: urlId, user_id });
     if (!url) {
       res.status(404).json({
-        success: false,
+        success: false, 
         message: "URL not found or access denied",
       });
       return;
